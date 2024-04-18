@@ -3,48 +3,56 @@
 using System;
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody))]
 public class PlayerMovement : MonoBehaviour {
 
-    //Assingables
+    #region Public Variables 
+
+    [Header("References")]
+    [Tooltip("The script MUST have these filled in order to work!")]
     public Transform playerCam;
     public Transform orientation;
-    
-    //Other
-    private Rigidbody rb;
+    public LayerMask ground;
 
-    //Rotation and look
-    private float xRotation;
-    private float sensitivity = 50f;
-    private float sensMultiplier = 1f;
+    [Header("Camera Settings")]
+    public float sensitivity = 50f;
+    public float sensMultiplier = 1f;
+
+    [Header("Accelerative Forces")]
+    public float moveForce = 4500;
+    public float slideForce = 400;
+    public float jumpForce = 550f;
+    public float gravity = 20.0f;
+
+    [Header("Restrictive Forces")]
+    public float frictionForce = 0.175f;
+    public float frictionWhileSliding = 0.2f;
     
-    //Movement
-    public float moveSpeed = 4500;
+    [Header("Limits")]
     public float maxSpeed = 20;
-    public bool grounded;
-    public LayerMask whatIsGround;
-    
-    public float counterMovement = 0.175f;
-    private float threshold = 0.01f;
     public float maxSlopeAngle = 35f;
 
-    //Crouch & Slide
+    [Header("Misc")]
+    public float jumpCooldown = 0.25f;
+    // I don't really understand what this variable does.
+    public float frictionThreshold = 0.01f;
+
+    #endregion 
+
+    #region Private Variables
+    private Rigidbody rb;
+    private float xRotation;
+    private bool isGrounded;
     private Vector3 crouchScale = new Vector3(1, 0.5f, 1);
     private Vector3 playerScale;
-    public float slideForce = 400;
-    public float slideCounterMovement = 0.2f;
-
-    //Jumping
     private bool readyToJump = true;
-    private float jumpCooldown = 0.25f;
-    public float jumpForce = 550f;
-    
-    //Input
     float x, y;
     bool jumping, sprinting, crouching;
-    
-    //Sliding
     private Vector3 normalVector = Vector3.up;
     private Vector3 wallNormalVector;
+    #endregion
+
+    #region Execution Functions 
 
     void Awake() {
         rb = GetComponent<Rigidbody>();
@@ -53,7 +61,6 @@ public class PlayerMovement : MonoBehaviour {
     void Start() {
         playerScale =  transform.localScale;
         Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
     }
 
     
@@ -62,31 +69,38 @@ public class PlayerMovement : MonoBehaviour {
     }
 
     private void Update() {
-        MyInput();
+        Input();
         Look();
     }
+
+    #endregion
+
+    #region Input
 
     /// <summary>
     /// Find user input. Should put this in its own class but im lazy
     /// </summary>
-    private void MyInput() {
-        x = Input.GetAxisRaw("Horizontal");
-        y = Input.GetAxisRaw("Vertical");
-        jumping = Input.GetButton("Jump");
-        crouching = Input.GetKey(KeyCode.LeftControl);
+    private void Input() {
+        x = UnityEngine.Input.GetAxisRaw("Horizontal");
+        y = UnityEngine.Input.GetAxisRaw("Vertical");
+        jumping = UnityEngine.Input.GetButton("Jump");
+        crouching = UnityEngine.Input.GetKey(KeyCode.LeftControl);
       
         //Crouching
-        if (Input.GetKeyDown(KeyCode.LeftControl))
+        if (UnityEngine.Input.GetKeyDown(KeyCode.LeftControl))
             StartCrouch();
-        if (Input.GetKeyUp(KeyCode.LeftControl))
+        if (UnityEngine.Input.GetKeyUp(KeyCode.LeftControl))
             StopCrouch();
     }
 
+    #endregion
+
+    #region Crouching
     private void StartCrouch() {
         transform.localScale = crouchScale;
         transform.position = new Vector3(transform.position.x, transform.position.y - 0.5f, transform.position.z);
         if (rb.velocity.magnitude > 0.5f) {
-            if (grounded) {
+            if (isGrounded) {
                 rb.AddForce(orientation.transform.forward * slideForce);
             }
         }
@@ -96,10 +110,11 @@ public class PlayerMovement : MonoBehaviour {
         transform.localScale = playerScale;
         transform.position = new Vector3(transform.position.x, transform.position.y + 0.5f, transform.position.z);
     }
+    #endregion
 
     private void Movement() {
         //Extra gravity
-        rb.AddForce(Vector3.down * Time.deltaTime * 10);
+        rb.AddForce(Vector3.down * Time.deltaTime * gravity);
         
         //Find actual velocity relative to where player is looking
         Vector2 mag = FindVelRelativeToLook();
@@ -115,7 +130,7 @@ public class PlayerMovement : MonoBehaviour {
         float maxSpeed = this.maxSpeed;
         
         //If sliding down a ramp, add force down so player stays grounded and also builds speed
-        if (crouching && grounded && readyToJump) {
+        if (crouching && isGrounded && readyToJump) {
             rb.AddForce(Vector3.down * Time.deltaTime * 3000);
             return;
         }
@@ -130,21 +145,22 @@ public class PlayerMovement : MonoBehaviour {
         float multiplier = 1f, multiplierV = 1f;
         
         // Movement in air
-        if (!grounded) {
+        if (!isGrounded) {
             multiplier = 0.5f;
             multiplierV = 0.5f;
         }
         
         // Movement while sliding
-        if (grounded && crouching) multiplierV = 0f;
+        if (isGrounded && crouching) multiplierV = 0f;
 
         //Apply forces to move player
-        rb.AddForce(orientation.transform.forward * y * moveSpeed * Time.deltaTime * multiplier * multiplierV);
-        rb.AddForce(orientation.transform.right * x * moveSpeed * Time.deltaTime * multiplier);
+        rb.AddForce(orientation.transform.forward * y * moveForce * Time.deltaTime * multiplier * multiplierV);
+        rb.AddForce(orientation.transform.right * x * moveForce * Time.deltaTime * multiplier);
     }
 
+    #region Jumping
     private void Jump() {
-        if (grounded && readyToJump) {
+        if (isGrounded && readyToJump) {
             readyToJump = false;
 
             //Add jump forces
@@ -165,11 +181,13 @@ public class PlayerMovement : MonoBehaviour {
     private void ResetJump() {
         readyToJump = true;
     }
-    
+
+    #endregion
+
     private float desiredX;
     private void Look() {
-        float mouseX = Input.GetAxis("Mouse X") * sensitivity * Time.fixedDeltaTime * sensMultiplier;
-        float mouseY = Input.GetAxis("Mouse Y") * sensitivity * Time.fixedDeltaTime * sensMultiplier;
+        float mouseX = UnityEngine.Input.GetAxis("Mouse X") * sensitivity * Time.fixedDeltaTime * sensMultiplier;
+        float mouseY = UnityEngine.Input.GetAxis("Mouse Y") * sensitivity * Time.fixedDeltaTime * sensMultiplier;
 
         //Find current look rotation
         Vector3 rot = playerCam.transform.localRotation.eulerAngles;
@@ -185,20 +203,20 @@ public class PlayerMovement : MonoBehaviour {
     }
 
     private void CounterMovement(float x, float y, Vector2 mag) {
-        if (!grounded || jumping) return;
+        if (!isGrounded || jumping) return;
 
         //Slow down sliding
         if (crouching) {
-            rb.AddForce(moveSpeed * Time.deltaTime * -rb.velocity.normalized * slideCounterMovement);
+            rb.AddForce(moveForce * Time.deltaTime * -rb.velocity.normalized * frictionWhileSliding);
             return;
         }
 
         //Counter movement
-        if (Math.Abs(mag.x) > threshold && Math.Abs(x) < 0.05f || (mag.x < -threshold && x > 0) || (mag.x > threshold && x < 0)) {
-            rb.AddForce(moveSpeed * orientation.transform.right * Time.deltaTime * -mag.x * counterMovement);
+        if (Math.Abs(mag.x) > frictionThreshold && Math.Abs(x) < 0.05f || (mag.x < -frictionThreshold && x > 0) || (mag.x > frictionThreshold && x < 0)) {
+            rb.AddForce(moveForce * orientation.transform.right * Time.deltaTime * -mag.x * frictionForce);
         }
-        if (Math.Abs(mag.y) > threshold && Math.Abs(y) < 0.05f || (mag.y < -threshold && y > 0) || (mag.y > threshold && y < 0)) {
-            rb.AddForce(moveSpeed * orientation.transform.forward * Time.deltaTime * -mag.y * counterMovement);
+        if (Math.Abs(mag.y) > frictionThreshold && Math.Abs(y) < 0.05f || (mag.y < -frictionThreshold && y > 0) || (mag.y > frictionThreshold && y < 0)) {
+            rb.AddForce(moveForce * orientation.transform.forward * Time.deltaTime * -mag.y * frictionForce);
         }
         
         //Limit diagonal running. This will also cause a full stop if sliding fast and un-crouching, so not optimal.
@@ -210,7 +228,7 @@ public class PlayerMovement : MonoBehaviour {
     }
 
     /// <summary>
-    /// Find the velocity relative to where the player is looking
+    /// Find the velocity relative to where the player is looking.
     /// Useful for vectors calculations regarding movement and limiting movement
     /// </summary>
     /// <returns></returns>
@@ -241,14 +259,14 @@ public class PlayerMovement : MonoBehaviour {
     private void OnCollisionStay(Collision other) {
         //Make sure we are only checking for walkable layers
         int layer = other.gameObject.layer;
-        if (whatIsGround != (whatIsGround | (1 << layer))) return;
+        if (ground != (ground | (1 << layer))) return;
 
         //Iterate through every collision in a physics update
         for (int i = 0; i < other.contactCount; i++) {
             Vector3 normal = other.contacts[i].normal;
             //FLOOR
             if (IsFloor(normal)) {
-                grounded = true;
+                isGrounded = true;
                 cancellingGrounded = false;
                 normalVector = normal;
                 CancelInvoke(nameof(StopGrounded));
@@ -264,7 +282,6 @@ public class PlayerMovement : MonoBehaviour {
     }
 
     private void StopGrounded() {
-        grounded = false;
+        isGrounded = false;
     }
-    
 }
