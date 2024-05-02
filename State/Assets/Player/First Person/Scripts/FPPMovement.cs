@@ -27,7 +27,7 @@ public class FPPMovement : MonoBehaviour
         controller = GetComponent<CharacterController>();
     }
 
-    void Update()
+    void FixedUpdate()
     {
         Movement();
         Jumping();
@@ -46,7 +46,7 @@ public class FPPMovement : MonoBehaviour
         controller.Move(movementDirection * speed * Time.deltaTime);
     }
 
-
+    // Doesn't work if VSync is not enabled 
     void Jumping()
     {
         // Check if player is grounded

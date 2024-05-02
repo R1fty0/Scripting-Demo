@@ -45,7 +45,6 @@ public class DoorTrigger : MonoBehaviour
             {
                 door.Close();
             }
-            door.Close();
         }
     }
     #endregion
